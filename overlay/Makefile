@@ -43,9 +43,12 @@ TARGET		:=	streamfin-overlay
 BUILD		:=	build
 SOURCES		:=	source ../ipc ../common ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
 DATA		:=	data
-INCLUDES	:=	lib/include ../ipc ../common
+INCLUDES	:=	../ipc ../common
 APP_VERSION	:=	$(VERSION)
 NO_ICON		:=  1
+
+# libultrahand (libtesla + libultra) — appends its own SOURCES/INCLUDES
+include $(TOPDIR)/lib/ultrahand.mk
 
 ifeq ($(RELEASE),)
 	APP_VERSION	:=	$(APP_VERSION)-$(shell git describe --dirty --always)
@@ -68,7 +71,7 @@ endif
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
+ARCH	:=	-march=armv8-a+simd+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
 CFLAGS	:=	-g -Wall -Wno-format-truncation -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
@@ -76,18 +79,21 @@ CFLAGS	:=	-g -Wall -Wno-format-truncation -O2 -ffunction-sections \
 CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION) -DNDEBUG=1 \
 			$(WANT_FLAGS)
 
+# libultrahand: per-overlay theme/config scope
+CFLAGS	+=	-DUI_OVERRIDE_PATH="\"/config/streamfin/\""
+
 # Overlay debug log -> sdmc:/jelly_ovl.log. Off by default; build with
 # `make JELLY_DEBUG=1` (propagates from the top-level Makefile too) to enable.
 ifeq ($(JELLY_DEBUG),1)
 CFLAGS	+=	-DJELLY_DEBUG=1
 endif
 
-CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++23
+CXXFLAGS	:= $(CFLAGS) -fno-exceptions -fno-rtti -std=c++26
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lturbojpeg -lnx
+LIBS	:= -lturbojpeg -lcurl -lz -lminizip -lmbedtls -lmbedx509 -lmbedcrypto -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -211,6 +217,7 @@ all	:	 $(OUTPUT).ovl
 
 $(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp
 	@elf2nro $< $@ $(NROFLAGS)
+	@printf 'ULTR' >> $@
 	@echo "built ... $(notdir $(OUTPUT).ovl)"
 
 $(OUTPUT).elf	:	$(OFILES)
