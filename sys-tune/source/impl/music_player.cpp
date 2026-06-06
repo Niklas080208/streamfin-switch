@@ -8,8 +8,10 @@
 #include "config/config.hpp"
 #include "source.hpp"
 #include "resamplers/SDL_audioEX.h"
+#include "../jelly_net.hpp"
 
 #include <cstring>
+#include <string>
 #include <nxExt.h>
 
 namespace tune::impl {
@@ -233,7 +235,7 @@ namespace tune::impl {
 
         constexpr auto AUDIO_FREQ          = 48000;
         constexpr auto AUDIO_CHANNEL_COUNT = 2;
-        constexpr auto AUDIO_BUFFER_COUNT  = 2;
+        constexpr auto AUDIO_BUFFER_COUNT  = 4;   // more cushion for network jitter
         constexpr auto AUDIO_LATENCY_MS    = 42;
         constexpr auto AUDIO_BUFFER_SIZE   = AUDIO_FREQ / 1000 * AUDIO_LATENCY_MS * AUDIO_CHANNEL_COUNT;
 
@@ -245,8 +247,8 @@ namespace tune::impl {
         bool g_should_run        = true;
 
         Result PlayTrack(const char* path) {
-            /* Open file and allocate */
-            auto source = OpenFile(path);
+            /* Open file (SD) or Jellyfin stream, and allocate */
+            auto source = IsJellyPath(path) ? OpenJelly(path) : OpenFile(path);
             R_UNLESS(source != nullptr, tune::FileOpenFailure);
             R_UNLESS(source->IsOpen(), tune::FileOpenFailure);
             R_UNLESS(source->SetupResampler(audoutGetChannelCount(), audoutGetSampleRate()), tune::VoiceInitFailure);
@@ -257,7 +259,7 @@ namespace tune::impl {
                 R_TRY(audoutStartAudioOut());
             }
 
-            g_source = source.get();
+            { std::scoped_lock lk(g_mutex); g_source = source.get(); }
 
             // for the first buffer, use very small buffer sizes to reduce latency between songs.
             int first = 1;
@@ -308,7 +310,7 @@ namespace tune::impl {
                 }
             }
 
-            g_source = nullptr;
+            { std::scoped_lock lk(g_mutex); g_source = nullptr; }
 
             return 0;
         }
@@ -392,6 +394,7 @@ namespace tune::impl {
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_should_run) {
             g_current.Reset();
+            std::string current_path;
             {
                 std::scoped_lock lk(g_mutex);
 
@@ -403,6 +406,10 @@ namespace tune::impl {
                     continue;
                 } else {
                     g_current = g_playlist.Get(g_queue_position, g_shuffle);
+                    // copy path under the lock (GetPath points into the playlist; a
+                    // concurrent ClearQueue would free it -> use-after-free)
+                    if (g_current.IsValid())
+                        current_path = g_playlist.GetPath(g_current);
                 }
             }
 
@@ -414,7 +421,7 @@ namespace tune::impl {
 
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
-            Result rc = PlayTrack(g_playlist.GetPath(g_current));
+            Result rc = PlayTrack(current_path.c_str());
 
             /* Log error. */
             if (R_FAILED(rc)) {
@@ -602,17 +609,16 @@ namespace tune::impl {
     }
 
     Result GetCurrentQueueItem(CurrentStats *out, char *buffer, size_t buffer_size) {
+        /* Hold the lock across the whole read: the tune thread can null + destroy
+           g_source between songs, so an unguarded deref races to a null crash. */
+        std::scoped_lock lk(g_mutex);
+
         R_UNLESS(g_source != nullptr, tune::NotPlaying);
         R_UNLESS(g_source->IsOpen(), tune::NotPlaying);
 
-        {
-            std::scoped_lock lk(g_mutex);
-
-            const auto path = g_playlist.GetPath(g_current);
-            R_UNLESS(path, tune::NotPlaying);
-
-            std::snprintf(buffer, buffer_size, "%s", path);
-        }
+        const auto path = g_playlist.GetPath(g_current);
+        R_UNLESS(path, tune::NotPlaying);
+        std::snprintf(buffer, buffer_size, "%s", path);
 
         auto [current, total] = g_source->Tell();
         int sample_rate       = g_source->GetSampleRate();
@@ -663,6 +669,7 @@ namespace tune::impl {
     }
 
     void Seek(u32 position) {
+        std::scoped_lock lk(g_mutex);
         if (g_source != nullptr && g_source->IsOpen())
             g_source->Seek(position);
     }
@@ -671,8 +678,8 @@ namespace tune::impl {
         if (GetSourceType(buffer) == SourceType::NONE)
             return tune::InvalidPath;
 
-        /* Ensure file exists. */
-        if (!sdmc::FileExists(buffer))
+        /* Ensure SD file exists (Jellyfin streams aren't local files). */
+        if (!IsJellyPath(buffer) && !sdmc::FileExists(buffer))
             return tune::InvalidPath;
 
         std::scoped_lock lk(g_mutex);
