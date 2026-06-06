@@ -18,4 +18,5 @@ class SettingsGui final : public tsl::Gui {
     char m_secret[160] = {};
     bool m_qc_active   = false;
     int  m_tick        = 0;
+    bool m_checking    = false;   // update check in flight
 };

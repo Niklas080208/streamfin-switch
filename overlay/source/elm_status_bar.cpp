@@ -285,7 +285,14 @@ void StatusBar::HandleNoItem() {
     if (holding)
         return;   // keep prior art/title/last_id; RefreshArt() holds the outgoing art
 
-    this->m_current_track = loading ? "Loading..." : "Stopped!";
+    // No queue = idle. Force m_playing false so the glyph shows play, not pause
+    // (the sysmodule can report playing=true with an empty queue on boot).
+    if (have_q) {
+        this->m_current_track = "Loading...";
+    } else {
+        this->m_current_track = "Nothing playing";
+        this->m_playing = false;
+    }
     this->m_stats = {};
     this->m_last_id[0] = '\0';
     ClearArt();        // release pins

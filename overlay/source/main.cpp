@@ -6,6 +6,7 @@
 #include "jelly_ovl.hpp"
 #include "art_loader.hpp"
 #include "meta_cache.hpp"
+#include "updater.hpp"
 #include "sdmc/sdmc.hpp"
 #include "pm/pm.hpp"
 #include "config/config.hpp"
@@ -19,6 +20,10 @@ class StreamfinOverlay final : public tsl::Overlay {
 
   public:
     void initServices() override {
+        tsl::highlightColor1 = {0x0, 0xA, 0xD, 0xF};   // #00A4DC
+        tsl::highlightColor2 = {0x0, 0xA, 0xD, 0xF};
+        tsl::clickColor      = {0x0, 0xA, 0xD, 0x7};
+
         if (R_FAILED(pm::Initialize())) {
             this->msg  = "Failed pm::Initialize()";
             return;
@@ -63,6 +68,7 @@ class StreamfinOverlay final : public tsl::Overlay {
         jelly_ovl::Init();
         art_loader::Init();   // background cover-art worker + prefetch
         meta_cache::Init();   // background track-name resolver + cache
+        updater::Init();      // background GitHub release checker (opt-in via Settings)
 
         u32 api;
         if (R_FAILED(tuneGetApiVersion(&api)) || api != TUNE_API_VERSION) {
@@ -72,6 +78,7 @@ class StreamfinOverlay final : public tsl::Overlay {
     }
 
     void exitServices() override {
+        updater::Exit();
         meta_cache::Exit();
         art_loader::Exit();
         jelly_ovl::Exit();

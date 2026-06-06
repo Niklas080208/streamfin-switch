@@ -54,7 +54,9 @@ namespace art_loader {
         }
 
         bool pinned(const char *id) {
-            return !std::strcmp(id, g_want) || !std::strcmp(id, g_keep);
+            // g_shown too: the UI thread draws that buffer outside the lock, so
+            // freeing it here would be a use-after-free.
+            return !std::strcmp(id, g_want) || !std::strcmp(id, g_keep) || !std::strcmp(id, g_shown);
         }
 
         // (lock held) free every decoded buffer that isn't the on-screen or wanted
@@ -83,7 +85,7 @@ namespace art_loader {
             if (slot < 0) {
                 for (int i = 0; i < CACHE; i++)
                     if (!pinned(g_cache[i].id)) { slot = i; break; }
-                if (slot < 0) slot = 0;
+                if (slot < 0) { if (px) std::free(px); return; }   // all pinned: drop the new image, never free on-screen art
                 if (g_cache[slot].px) std::free(g_cache[slot].px);
                 g_cache[slot] = Entry{};
             }

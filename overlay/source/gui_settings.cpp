@@ -2,6 +2,7 @@
 
 #include "gui_keyboard.hpp"
 #include "jelly_ovl.hpp"
+#include "updater.hpp"
 #include "config/config.hpp"
 
 #include <cstring>
@@ -119,11 +120,48 @@ tsl::elm::Element *SettingsGui::createUI() {
     });
     list->addItem(out);
 
+    auto upd = new tsl::elm::ListItem("Check for Updates");
+    upd->setClickListener([this](u64 keys) {
+        if (keys & HidNpadButton_A) {
+            if (!this->m_checking) {
+                updater::Check();
+                this->m_checking = true;
+                this->m_status   = "Checking for updates...";
+            }
+            return true;
+        }
+        return false;
+    });
+    list->addItem(upd);
+
     frame->setContent(list);
     return frame;
 }
 
 void SettingsGui::update() {
+    if (m_checking) {
+        char tag[32] = {};
+        switch (updater::Poll(tag, sizeof tag)) {
+            case updater::State::Available: {
+                char line[64];
+                std::snprintf(line, sizeof line, "Update available: %s  (get it on GitHub)", tag);
+                m_status   = line;
+                m_checking = false;
+                break;
+            }
+            case updater::State::UpToDate:
+                m_status   = "Streamfin is up to date";
+                m_checking = false;
+                break;
+            case updater::State::Failed:
+                m_status   = "Update check failed - check connection";
+                m_checking = false;
+                break;
+            default:   // Checking: keep waiting
+                break;
+        }
+    }
+
     if (!m_qc_active) return;
     if (++m_tick < 40) return;   // poll roughly once a second
     m_tick = 0;

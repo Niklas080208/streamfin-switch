@@ -13,10 +13,10 @@ namespace {
     constexpr int MAX_ENTRIES = 400;   // cap on playlists/artists listed
 
     // Clear the queue, enqueue every resolved track, and start playback.
-    void play_tracks(const std::vector<jelly_ovl::Track> &tr, StreamfinOverlayFrame *frame, const char *what) {
+    bool play_tracks(const std::vector<jelly_ovl::Track> &tr, StreamfinOverlayFrame *frame, const char *what) {
         if (tr.empty()) {
             if (frame) frame->setToast(what, "Nothing playable found");
-            return;
+            return false;
         }
         tuneClearQueue();
         char path[80];
@@ -26,11 +26,13 @@ namespace {
         }
         tuneSelect(0);
         tunePlay();
+        return true;
     }
 
-    // Resolve via `fn`, then play. Shows a toast on a network/parse failure.
+    // Resolve via `fn`, then play. On success pop back to the player; on a
+    // network/parse failure show a toast and stay put. back_levels = picker depth.
     template <typename Fn>
-    void resolve_and_play(StreamfinOverlayFrame *frame, const char *what, Fn &&fn) {
+    void resolve_and_play(StreamfinOverlayFrame *frame, const char *what, int back_levels, Fn &&fn) {
         std::vector<jelly_ovl::Track> tr(MAX_TRACKS);
         int n = fn(tr.data(), MAX_TRACKS);
         if (n < 0) {
@@ -38,7 +40,8 @@ namespace {
             return;
         }
         tr.resize(n);
-        play_tracks(tr, frame, what);
+        if (play_tracks(tr, frame, what))
+            tsl::goBack(back_levels);
     }
 
 }
@@ -55,7 +58,7 @@ tsl::elm::Element *PickerGui::createUI() {
         auto shuffle = new tsl::elm::ListItem("Shuffle All");
         shuffle->setClickListener([frame](u64 keys) {
             if (keys & HidNpadButton_A) {
-                resolve_and_play(frame, "Shuffle All",
+                resolve_and_play(frame, "Shuffle All", 1,
                     [](jelly_ovl::Track *o, int m) { return jelly_ovl::GetShuffleAll(o, m); });
                 return true;
             }
@@ -100,7 +103,7 @@ tsl::elm::Element *PickerGui::createUI() {
             auto item = new tsl::elm::ListItem(name);
             item->setClickListener([frame, id, name, is_playlists](u64 keys) {
                 if (keys & HidNpadButton_A) {
-                    resolve_and_play(frame, name.c_str(),
+                    resolve_and_play(frame, name.c_str(), 2,
                         [&](jelly_ovl::Track *o, int m) {
                             return is_playlists ? jelly_ovl::GetPlaylistTracks(id.c_str(), o, m)
                                                 : jelly_ovl::GetArtistTracks(id.c_str(), o, m);
@@ -110,7 +113,7 @@ tsl::elm::Element *PickerGui::createUI() {
                 if (keys & HidNpadButton_Y) {
                     // InstantMix radio seeded by this artist/playlist.
                     std::string what = std::string("Radio: ") + name;
-                    resolve_and_play(frame, what.c_str(),
+                    resolve_and_play(frame, what.c_str(), 2,
                         [&](jelly_ovl::Track *o, int m) { return jelly_ovl::GetInstantMix(id.c_str(), o, m); });
                     return true;
                 }

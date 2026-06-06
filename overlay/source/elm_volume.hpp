@@ -6,7 +6,9 @@
 class ElmVolume final : public tsl::elm::StepTrackBar {
 public:
     ElmVolume(const char icon[3], const std::string& name, size_t numSteps)
-        : StepTrackBar{icon, numSteps}, m_name{name} { }
+        : StepTrackBar{icon, numSteps}, m_name{name} {
+        this->m_usingStepTrackbar = false; 
+    }
 
     virtual ~ElmVolume() {}
 
