@@ -1,11 +1,13 @@
-## Streamfin is a background music player built for Ultrahand Overlay that lets you stream music from your Jellyfin server! 
+## Streamfin is a music player for Ultrahand Overlay that lets you stream music from your Jellyfin server! 
+<p align="center">
+  <img width="800" alt="Still 2026-06-06 135124_1 3 1-2" src="https://github.com/user-attachments/assets/168cfa45-ffde-4710-9da6-5d91a30e59ad" />
+</p>
 
-Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedBehemoth/sys-tune), I replaced the SD audio card source with a streaming Jellyfin HTTP source. Supports FLACs, WAVs, and MP3's streaming directly from your Jellyfin library!
+Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedBehemoth/sys-tune), Streamfin replaces the SD audio card source with a streaming Jellyfin HTTP source. Supports FLACs, WAVs, and MP3's streaming directly from your Jellyfin library!
 
 ## Installation Instructions
 
-[Download Here
-](https://github.com/dammitjeff/streamfin-switch/releases/latest)
+## [BIG DOWNLOAD BUTTON HERE](https://github.com/dammitjeff/streamfin-switch/releases/latest)
 - Drag and drop the two folders to the root of your SD card
 - Reboot the console
 - Open Ultrahand Overlay (default L + DPad-Down + R-stick)
@@ -14,8 +16,27 @@ Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedB
 
 **Note for Mac Users**: By default, Mac tends to hide .overlay folders. When transferring over the files from a Mac, be sure to do CMD + Shift + . to show hidden files, to ensure the entire folder gets transferred over to your switch. 
 
+## Screenshots!
+<img width="1280" height="720" alt="2026060613081500-334BB3B1BC68FB8B9F441C8EAE4F8F4E" src="https://github.com/user-attachments/assets/2f770320-ebd6-4bad-8424-a2ecea2464e3" />
+<br>
+<br>
+<p align="center">
+<img height="480" alt="2026060614123700-C7C3CAEB6C50DA2C777325EA990171EE" src="https://github.com/user-attachments/assets/85df0597-f0b0-4044-8724-a5d862c35f8b" />
+<br> Sign in via Jellyfin Quick Connect makes it much easier to connect to your server!
+</p>
+
+<p align="center">
+<img  height="480" alt="2026060614120200-C7C3CAEB6C50DA2C777325EA990171EE" src="https://github.com/user-attachments/assets/359c549e-9505-45da-b747-a9065f2057a9" />
+<br> Browse through all of your artists, or hit Y to create a radio station based off the artist!
+</p>
+<p align="center">
+<img height="480" alt="2026060614074700-6EEDD66FEF4A4CCC31CCF68D2CE2B6B5" src="https://github.com/user-attachments/assets/3b243f57-1f1d-4e1e-bc4f-deda55e5ed9b" />
+<br> Music is persistant, even when switching between games. :)
+</p> 
+
+
 ## Special thanks
 - [HookedBehemoth](https://github.com/HookedBehemoth/sys-tune) for **sys-tune**, Streamfin's player is heavily built off of.
 - [David Reid (mackron)](https://github.com/mackron) for **[dr_libs](https://github.com/mackron/dr_libs/)** — the `dr_flac` / `dr_mp3` / `dr_wav` audio decoders.
 - [Serge Zaitsev](https://github.com/zserge) for **[jsmn](https://github.com/zserge/jsmn)**, which parses JSON used for the Jellyfin API.
-- The **[libjpeg-turbo](https://libjpeg-turbo.org/)** decodes cover art jpegs.
+- **[libjpeg-turbo](https://libjpeg-turbo.org/)** which decodes cover art jpegs.
