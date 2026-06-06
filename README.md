@@ -1,25 +1,21 @@
-# sys-tune
-## Background audio player for the Nintendo switch + Tesla overlay
+## Streamfin is a background music player built for Ultrahand Overlay that lets you stream music from your Jellyfin server! 
 
-## Installation
-1. Download the release zip from [here](https://github.com/HookedBehemoth/sys-tune/releases/latest)
-2. Extract the zip to the root of your sd card.
-3. Put mp3, flac, wav or wave files to your sd card.
+Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedBehemoth/sys-tune), I replaced the SD audio card source with a streaming Jellyfin HTTP source. Supports FLACs, WAVs, and MP3's streaming directly from your Jellyfin library!
 
-You can manage playback via the Tesla overlay in the release.
+## Installation Instructions
 
-## Screenshots
-![Main](/sample/libtesla_1586882452.jpg)
-![Main](/sample/libtesla_1586882672.jpg)
-![Main](/sample/libtesla_1586882735.jpg)
-(Alpha values are wrong in these screenshots. The overlay will be less transparent.)
+[Download Here
+](https://github.com/dammitjeff/streamfin-switch/releases/latest)
+- Drag and drop the two folders to the root of your SD card
+- Reboot the console
+- Open Ultrahand Overlay (default L + DPad-Down + R-stick)
+- Open Streamfin and scroll down to Settings
+- Enter your server (host:port) and pair with Quick Connect
 
-## Special thanks to:
-- [mackron](http://mackron.github.io/) who made the awesome [audio decoders used here.](https://github.com/mackron/dr_libs/)
-- [WerWolv](https://werwolv.net/) for making libtesla, the UI library used for the control overlay.
-- [TotalJustice](https://github.com/ITotalJustice) for bug fixes, adding some features and bad code.
+**Note for Mac Users**: By default, Mac tends to hide .overlay folders. When transferring over the files from a Mac, be sure to do CMD + Shift + . to show hidden files, to ensure the entire folder gets transferred over to your switch. 
 
-## Info for developers
-I implemented an IPC interface accessible via service wrappers [here](/ipc/).
-
-My [Tesla overlay](/overlay/source/) uses these bindings.
+## Special thanks
+- [HookedBehemoth](https://github.com/HookedBehemoth/sys-tune) for **sys-tune**, Streamfin's player is heavily built off of.
+- [David Reid (mackron)](https://github.com/mackron) for **[dr_libs](https://github.com/mackron/dr_libs/)** — the `dr_flac` / `dr_mp3` / `dr_wav` audio decoders.
+- [Serge Zaitsev](https://github.com/zserge) for **[jsmn](https://github.com/zserge/jsmn)**, which parses JSON used for the Jellyfin API.
+- The **[libjpeg-turbo](https://libjpeg-turbo.org/)** decodes cover art jpegs.
