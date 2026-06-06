@@ -14,7 +14,7 @@ Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedB
 - Open Streamfin and scroll down to Settings
 - Enter your server (host:port) and pair with Quick Connect
 
-**Note for Mac Users**: By default, Mac tends to hide .overlay folders. When transferring over the files from a Mac, be sure to do CMD + Shift + . to show hidden files, to ensure the entire folder gets transferred over to your switch. 
+**Note for Mac users**: By default, Mac tends to hide .overlay folders. When transferring over the files from a Mac, be sure to do CMD + Shift + . to show hidden files, and make sure the `.overlays` folder ACTUALLY gets transferred over to your switch. 
 
 ## Screenshots!
 <img width="1280" height="720" alt="2026060613081500-334BB3B1BC68FB8B9F441C8EAE4F8F4E" src="https://github.com/user-attachments/assets/2f770320-ebd6-4bad-8424-a2ecea2464e3" />
