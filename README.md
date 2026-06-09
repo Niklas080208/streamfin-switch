@@ -5,6 +5,9 @@
 
 Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedBehemoth/sys-tune), Streamfin replaces the SD audio card source with a streaming Jellyfin HTTP source. Supports FLACs, WAVs, and MP3's streaming directly from your Jellyfin library!
 
+**REQUIRES [ULTRAHAND OVERLAY](https://github.com/ppkantorski/Ultrahand-Overlay) TO BE INSTALLED!!** 
+Go install that first from the link, or you can one-click install it in the homebrew app store of your choice.
+
 ## Installation Instructions
 
 ## [BIG DOWNLOAD BUTTON HERE](https://github.com/dammitjeff/streamfin-switch/releases/latest)
