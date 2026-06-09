@@ -11,11 +11,14 @@ namespace jelly_cfg {
         char g_host[160]  = {};
         u16  g_port       = 0;
         char g_token[160] = {};
+        bool g_tls        = false;
 
         // Parse "host:port" (optionally http(s):// prefixed) into g_host/g_port.
+        // https:// -> TLS, default port 443; otherwise plain, default 8096.
         void parse_server(const char *s) {
+            g_tls = false;
             if (!std::strncmp(s, "http://", 7))       s += 7;
-            else if (!std::strncmp(s, "https://", 8)) s += 8;
+            else if (!std::strncmp(s, "https://", 8)) { s += 8; g_tls = true; }
             const char *colon = std::strrchr(s, ':');
             if (colon && colon[1]) {
                 size_t hl = (size_t)(colon - s);
@@ -25,7 +28,7 @@ namespace jelly_cfg {
                 g_port = (u16)std::atoi(colon + 1);
             } else {
                 std::snprintf(g_host, sizeof g_host, "%s", s);
-                g_port = 8096;   // default Jellyfin port
+                g_port = g_tls ? 443 : 8096;
             }
         }
     }
@@ -38,6 +41,7 @@ namespace jelly_cfg {
         } else {
             g_host[0] = '\0';   // not configured -> connect() bails until sign-in
             g_port    = 0;
+            g_tls     = false;
         }
         char token[160] = {};
         config::get_jelly_token(token, sizeof token);
@@ -47,5 +51,6 @@ namespace jelly_cfg {
     const char *host()  { return g_host; }
     u16         port()  { return g_port; }
     const char *token() { return g_token; }
+    bool        tls()   { return g_tls; }
 
 }

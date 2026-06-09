@@ -4,6 +4,8 @@
 #include <string>
 #include <switch.h>
 
+#include "jelly_http.hpp"
+
 namespace jelly {
 
     // Persistent HTTP streaming reader with a background prefetch thread.
@@ -15,7 +17,7 @@ namespace jelly {
         static constexpr size_t RING = 1024 * 1024;   // 1 MB prefetch buffer
 
         std::string m_path;        // server request path
-        int  m_fd     = -1;        // current connection (-1 = none)
+        jelly_http::Conn m_conn;   // current connection (plain or TLS)
         long m_pos    = -1;        // file offset the consumer will read next
         long m_total  = -1;        // total file size (from Content-Range)
 

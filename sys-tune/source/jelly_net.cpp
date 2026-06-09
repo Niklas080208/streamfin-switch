@@ -4,6 +4,7 @@
 
 #include <switch.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -36,24 +37,23 @@ namespace jelly {
     // Ring-buffer byte moves with wraparound. Caller holds m_mtx and adjusts
     // m_count; these just shuttle bytes and advance the head/tail index.
     void Stream::ring_put(const u8 *src, size_t n) {
-        for (size_t i = 0; i < n; i++) {
-            m_ring[m_tail] = src[i];
-            m_tail = (m_tail + 1) % RING;
-        }
+        size_t first = RING - m_tail; if (first > n) first = n;
+        std::memcpy(m_ring + m_tail, src, first);
+        std::memcpy(m_ring, src + first, n - first);
+        m_tail = (m_tail + n) % RING;
     }
     void Stream::ring_get(u8 *dst, size_t n) {
-        for (size_t i = 0; i < n; i++) {
-            dst[i] = m_ring[m_head];
-            m_head = (m_head + 1) % RING;
-        }
+        size_t first = RING - m_head; if (first > n) first = n;
+        std::memcpy(dst, m_ring + m_head, first);
+        std::memcpy(dst + first, m_ring, n - first);
+        m_head = (m_head + n) % RING;
     }
 
-    // Background producer: pull bytes off the socket into the ring buffer.
+    // Background producer: pull bytes off the connection into the ring buffer.
     void Stream::reader() {
-        const int fd = m_fd;
         u8 tmp[16384];
         while (true) {
-            ssize_t n = recv(fd, tmp, sizeof tmp, 0);
+            ssize_t n = jelly_http::conn_recv(m_conn, tmp, sizeof tmp);
             if (n <= 0) {  // EOF (Connection: close), error, or socket closed by shutdown()
                 mutexLock(&m_mtx);
                 m_eof = true;
@@ -84,12 +84,13 @@ namespace jelly {
             condvarWakeAll(&m_cv_space);
             condvarWakeAll(&m_cv_data);
             mutexUnlock(&m_mtx);
-            if (m_fd >= 0) { close(m_fd); m_fd = -1; }  // interrupt a blocking recv
+            jelly_http::conn_interrupt(m_conn);   // unblock the reader's conn_recv
             threadWaitForExit(&m_thread);
             threadClose(&m_thread);
+            jelly_http::conn_close(m_conn);        // free the TLS ctx now the reader is gone
             m_have_thread = false;
-        } else if (m_fd >= 0) {
-            close(m_fd); m_fd = -1;
+        } else {
+            jelly_http::conn_close(m_conn);
         }
         m_head = m_tail = m_count = 0;
         m_eof = m_stop = false;
@@ -99,51 +100,38 @@ namespace jelly {
         shutdown();
         if (!m_ring) return false;
 
-        m_fd = jelly_http::connect(jelly_cfg::host(), jelly_cfg::port(), 5000);
-        if (m_fd < 0) return false;
-
-        // Open-ended range so the server streams from `offset` to EOF on one connection.
         char range[48];
         std::snprintf(range, sizeof range, "Range: bytes=%ld-\r\n", offset);
         const std::string extra = jelly_http::auth_header(jelly_cfg::token(), true) + "\r\n" + range;
-        const std::string req = jelly_http::build_request("GET", m_path, jelly_cfg::host(), extra, "");
-        if (send(m_fd, req.data(), req.size(), 0) < 0) { close(m_fd); m_fd = -1; return false; }
-
-        // Read until the end of headers.
-        std::string hdr;
-        char buf[8192];
-        size_t he;
-        while ((he = hdr.find("\r\n\r\n")) == std::string::npos) {
-            ssize_t n = recv(m_fd, buf, sizeof buf, 0);
-            if (n <= 0) { close(m_fd); m_fd = -1; return false; }
-            hdr.append(buf, n);
-        }
-
-        const int status = jelly_http::parse_status(hdr.c_str());
-        if (status != 200 && status != 206) { close(m_fd); m_fd = -1; return false; }
+        jelly_http::Response r = jelly_http::request(jelly_cfg::host(), jelly_cfg::port(), jelly_cfg::tls(),
+                                                     5000, "GET", m_path, extra, "");
+        if (!jelly_http::conn_ok(r.conn)) return false;
+        if (r.status != 200 && r.status != 206) { jelly_http::conn_close(r.conn); return false; }
+        m_conn = r.conn;
 
         if (m_total < 0) {
-            long total = jelly_http::parse_content_range_total(hdr);
+            long total = jelly_http::parse_content_range_total(r.headers);
             if (total >= 0) {
                 m_total = total;
             } else {
-                auto cl = hdr.find("Content-Length:");
-                if (cl != std::string::npos) m_total = offset + std::strtol(hdr.c_str() + cl + 15, nullptr, 10);
+                auto cl = r.headers.find("Content-Length:");
+                if (cl != std::string::npos) m_total = offset + std::strtol(r.headers.c_str() + cl + 15, nullptr, 10);
             }
         }
 
-        // Seed the ring with body bytes already received past the headers.
-        std::string residual = hdr.substr(he + 4);
-        size_t seed = residual.size() < RING ? residual.size() : RING;
-        std::memcpy(m_ring, residual.data(), seed);
+        size_t seed = r.residual.size() < RING ? r.residual.size() : RING;
+        std::memcpy(m_ring, r.residual.data(), seed);
         m_tail = seed % RING;
         m_count = seed;
         m_head = 0;
         m_pos = offset;
         m_eof = m_stop = false;
 
+        struct timeval zero = { 0, 0 };   // stream without a recv timeout
+        setsockopt(m_conn.fd, SOL_SOCKET, SO_RCVTIMEO, &zero, sizeof zero);
+
         if (R_FAILED(threadCreate(&m_thread, reader_trampoline, this, nullptr, 0x8000, 0x20, -2))) {
-            close(m_fd); m_fd = -1; return false;
+            jelly_http::conn_close(m_conn); return false;
         }
         threadStart(&m_thread);
         m_have_thread = true;

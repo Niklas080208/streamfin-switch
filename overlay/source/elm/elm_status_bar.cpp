@@ -4,6 +4,7 @@
 #include "config/config.hpp"
 #include "jelly_ovl.hpp"
 #include "art_loader.hpp"
+#include "meta_cache.hpp"
 #include "ovl_log.hpp"
 
 #include <cstdlib>
@@ -77,7 +78,9 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
         }
     }
     if (this->m_truncated) {
+        renderer->enableScissoring(this->getX() + 15, TitleY() - 26, this->getWidth() - 30, 34);
         renderer->drawString(this->m_scroll_text.c_str(), false, this->getX() + 15 - this->m_scroll_offset, TitleY(), 23, tsl::style::color::ColorText);
+        renderer->disableScissoring();
         if (this->m_counter == 120) {
             if (this->m_scroll_offset == this->m_text_width) { this->m_scroll_offset = 0; this->m_counter = 0; }
             else { this->m_scroll_offset++; }
@@ -231,27 +234,28 @@ void StatusBar::update() {
 }
 
 void StatusBar::ResolveJellyTrack() {
-    /* Jellyfin track: resolve "Title - Artist" once per id (HTTP). */
     const char *id = std::strrchr(path_buffer, '/');
     id = id ? id + 1 : path_buffer + 8;
-    if (std::strcmp(id, this->m_last_id) == 0)
-        return;   // same track -> nothing to refetch
 
-    std::strncpy(this->m_last_id, id, sizeof(this->m_last_id) - 1);
-    char nm[128] = {}, ar[128] = {};
-    if (jelly_ovl::GetTrackInfo(id, nm, sizeof nm, ar, sizeof ar) && nm[0]) {
-        if (ar[0])
-            std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s  -  %s", nm, ar);
-        else
-            std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s", nm);
-    } else {
-        std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s", id);
+    if (std::strcmp(id, this->m_last_id) != 0) {
+        std::strncpy(this->m_last_id, id, sizeof(this->m_last_id) - 1);
+        std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s", id);   // placeholder until resolved
+        this->m_current_track = this->m_name_buf;
+        this->m_name_resolved = false;
+        ovl_log::Line("ui: now playing %.8s", id);
+        ResetScroll();
     }
-    this->m_current_track = this->m_name_buf;
-    ovl_log::Line("ui: now playing %.8s \"%s\"", id, this->m_name_buf);
 
-    /* Don't blank art here — the old cover holds until the new one decodes. */
-    ResetScroll();
+    // meta_cache resolves names on a background thread — never block the UI here.
+    if (!this->m_name_resolved) {
+        char name[160];
+        if (meta_cache::Get(id, name, sizeof name) && name[0]) {
+            std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s", name);
+            this->m_current_track = this->m_name_buf;
+            this->m_name_resolved = true;
+            ResetScroll();
+        }
+    }
 }
 
 void StatusBar::ResolveSdFile() {

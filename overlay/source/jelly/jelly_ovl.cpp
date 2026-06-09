@@ -64,32 +64,22 @@ namespace jelly_ovl {
                                  bool *out_truncated = nullptr) {
             if (out_status) *out_status = 0;
             if (out_truncated) *out_truncated = false;
-            int fd = jelly_http::connect(jelly_cfg::host(), jelly_cfg::port(), 3000);
-            if (fd < 0) return {};
-            // recv timeout so a stalled server can't hang the UI thread
-            struct timeval rtv; rtv.tv_sec = 5; rtv.tv_usec = 0;
-            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rtv, sizeof rtv);
-
             const std::string extra = jelly_http::auth_header(jelly_cfg::token(), use_token) + "\r\n";
-            const std::string req = jelly_http::build_request(method, path, jelly_cfg::host(), extra, json_body);
+            jelly_http::Response rsp = jelly_http::request(jelly_cfg::host(), jelly_cfg::port(), jelly_cfg::tls(),
+                                                           6000, method, path, extra, json_body);
+            if (!jelly_http::conn_ok(rsp.conn)) {
+                ovl_log::Line("http: CONNECT/handshake FAIL %s tls=%d %.48s", method, (int)jelly_cfg::tls(), path.c_str());
+                return {};
+            }
+            if (out_status) *out_status = rsp.status;
 
-            if (send(fd, req.data(), req.size(), 0) < 0) { close(fd); return {}; }
+            std::string body = rsp.residual; char buf[4096]; ssize_t n;
+            while ((n = jelly_http::conn_recv(rsp.conn, buf, sizeof buf)) > 0) body.append(buf, n);
+            jelly_http::conn_close(rsp.conn);
 
-            std::string raw; char buf[4096]; ssize_t n;
-            while ((n = recv(fd, buf, sizeof buf, 0)) > 0) raw.append(buf, n);
-            close(fd);
-
-            auto he = raw.find("\r\n\r\n");
-            if (he == std::string::npos) return {};
-            std::string headers = raw.substr(0, he);
-            std::string body = raw.substr(he + 4);
-
-            if (out_status) *out_status = jelly_http::parse_status(raw.c_str());
-
-            std::string hl = headers;
+            std::string hl = rsp.headers;
             for (auto &c : hl) c = (char)tolower(c);
 
-            // Detect a short read against Content-Length (chunked has none).
             auto clp = hl.find("content-length:");
             if (clp != std::string::npos && out_truncated) {
                 long cl = std::strtol(hl.c_str() + clp + 15, nullptr, 10);
@@ -261,19 +251,22 @@ namespace jelly_ovl {
         if (uid_sz) uid[0] = '\0';
 
         std::string conn = http_request("GET", std::string("/QuickConnect/Connect?Secret=") + secret, false, "");
-        if (conn.empty()) return -1;
+        ovl_log::Line("qc: connect poll -> %zuB", conn.size());
+        if (conn.empty()) return 0;   // transient (e.g. a flaky handshake) -> keep polling, don't abort
         {
             // Parse the "Authenticated" bool properly (JSMN_PRIMITIVE -> "true"/"false").
             Json jc = json_parse(conn);
-            if (!jc) return -1;
+            if (!jc) return 0;        // unparseable -> treat as still-waiting
             int authi = obj_get(jc.tok(), 0, conn.c_str(), "Authenticated");
             if (authi < 0 || conn[jc.tok()[authi].start] != 't')
                 return 0; // still waiting for the user to approve
         }
 
+        ovl_log::Line("qc: authenticated -> token exchange");
         std::string ex = http_request("POST", "/Users/AuthenticateWithQuickConnect", false,
                                       std::string("{\"Secret\":\"") + secret + "\"}");
-        if (ex.empty()) return -1;
+        ovl_log::Line("qc: exchange -> %zuB", ex.size());
+        if (ex.empty()) return 0;     // approved but exchange hiccuped -> retry next poll
 
         Json j = json_parse(ex);
         if (!j) return -1;
@@ -281,7 +274,7 @@ namespace jelly_ovl {
 
         int ti = obj_get(t, 0, ex.c_str(), "AccessToken");
         int ui = obj_get(t, 0, ex.c_str(), "User");
-        if (ti < 0 || ui < 0) return -1;
+        if (ti < 0 || ui < 0) { ovl_log::Line("qc: exchange resp has no token: %.80s", ex.c_str()); return -1; }
         tok_copy(ex.c_str(), t[ti], token, token_sz);
         int idi = obj_get(t, ui, ex.c_str(), "Id");
         if (idi < 0) return -1;

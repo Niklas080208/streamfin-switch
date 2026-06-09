@@ -13,5 +13,6 @@ namespace jelly_cfg {
     const char *host();     // "" if not signed in
     u16         port();     // 0  if not signed in
     const char *token();    // "" if not signed in
+    bool        tls();      // true when the server was entered as https://
 
 }

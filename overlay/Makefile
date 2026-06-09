@@ -41,9 +41,9 @@ APP_TITLE	:=	Streamfin
 
 TARGET		:=	streamfin-overlay
 BUILD		:=	build
-SOURCES		:=	source ../ipc ../common ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
+SOURCES		:=	source source/gui source/elm source/jelly source/core ../ipc ../common ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
 DATA		:=	data
-INCLUDES	:=	../ipc ../common
+INCLUDES	:=	source/gui source/elm source/jelly source/core source/third_party ../ipc ../common
 APP_VERSION	:=	$(VERSION)
 NO_ICON		:=  1
 

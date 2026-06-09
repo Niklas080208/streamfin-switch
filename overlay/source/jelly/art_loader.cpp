@@ -8,6 +8,9 @@
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
+#ifdef JELLY_DEBUG
+#include <malloc.h>
+#endif
 
 namespace art_loader {
 
@@ -116,6 +119,10 @@ namespace art_loader {
                 evict_unpinned();   // free heap for the decode
                 mutexUnlock(&g_mtx);
 
+#ifdef JELLY_DEBUG
+                { struct mallinfo mi = mallinfo();
+                  ovl_log::Line("heap: used=%dK free=%dK", mi.uordblks / 1024, mi.fordblks / 1024); }
+#endif
                 ovl_log::Line("art: fetch %.8s", job);
                 const u64 t0 = armGetSystemTick();
                 int w = 0, h = 0;

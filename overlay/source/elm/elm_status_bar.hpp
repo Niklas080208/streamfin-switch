@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../ipc/tune.h"
+#include "tune.h"
 #include "symbol.hpp"
 
 #include <tesla.hpp>
@@ -19,6 +19,7 @@ class StatusBar final : public tsl::elm::Element {
     std::string_view m_current_track;
     char m_name_buf[160]{};   // resolved "Title - Artist" for jelly:// tracks
     char m_last_id[48]{};     // the current track id (one source of truth; "" when none)
+    bool m_name_resolved = false;
     u8 *m_art = nullptr;      // BORROWED RGBA cover art (owned by art_loader; never free)
     int m_art_w = 0, m_art_h = 0;
     UiPhase m_phase = UiPhase::Playing;   // last logged phase (for transition logging)
