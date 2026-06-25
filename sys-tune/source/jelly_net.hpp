@@ -14,7 +14,9 @@ namespace jelly {
     // This decouples network jitter from audio decode so playback stays smooth
     // even while a game contends for the system CPU core. Reopens only on seek.
     class Stream {
-        static constexpr size_t RING = 1024 * 1024;   // 1 MB prefetch buffer
+        static constexpr size_t HEAP_REGION   = 0x200000;
+        static constexpr size_t RING          = 1024 * 1024;
+        static constexpr size_t FALLBACK_RING = 256 * 1024;
 
         std::string m_path;        // server request path
         jelly_http::Conn m_conn;   // current connection (plain or TLS)
@@ -22,6 +24,8 @@ namespace jelly {
         long m_total  = -1;        // total file size (from Content-Range)
 
         u8     *m_ring  = nullptr;  // prefetch ring (compressed bytes)
+        size_t  m_ring_cap = 0;
+        bool    m_ring_ondemand = false;
         size_t  m_head  = 0;        // consumer index
         size_t  m_tail  = 0;        // producer index
         size_t  m_count = 0;        // bytes currently buffered

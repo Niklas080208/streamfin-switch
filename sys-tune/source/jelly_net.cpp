@@ -23,7 +23,15 @@ namespace jelly {
 
     // ---- persistent streaming reader ----
     Stream::Stream(const char *path) : m_path(path) {
-        m_ring = new (std::nothrow) u8[RING];
+        void *base = nullptr;
+        if (R_SUCCEEDED(svcSetHeapSize(&base, HEAP_REGION)) && base != nullptr) {
+            m_ring = static_cast<u8 *>(base);
+            m_ring_cap = RING;
+            m_ring_ondemand = true;
+        } else {
+            m_ring = new (std::nothrow) u8[FALLBACK_RING];
+            m_ring_cap = m_ring ? FALLBACK_RING : 0;
+        }
         mutexInit(&m_mtx);
         condvarInit(&m_cv_data);
         condvarInit(&m_cv_space);
@@ -31,22 +39,30 @@ namespace jelly {
 
     Stream::~Stream() {
         shutdown();
-        delete[] m_ring;
+        if (m_ring) {
+            if (m_ring_ondemand) {
+                void *base = nullptr;
+                svcSetHeapSize(&base, 0);
+            } else {
+                delete[] m_ring;
+            }
+            m_ring = nullptr;
+        }
     }
 
     // Ring-buffer byte moves with wraparound. Caller holds m_mtx and adjusts
     // m_count; these just shuttle bytes and advance the head/tail index.
     void Stream::ring_put(const u8 *src, size_t n) {
-        size_t first = RING - m_tail; if (first > n) first = n;
+        size_t first = m_ring_cap - m_tail; if (first > n) first = n;
         std::memcpy(m_ring + m_tail, src, first);
         std::memcpy(m_ring, src + first, n - first);
-        m_tail = (m_tail + n) % RING;
+        m_tail = (m_tail + n) % m_ring_cap;
     }
     void Stream::ring_get(u8 *dst, size_t n) {
-        size_t first = RING - m_head; if (first > n) first = n;
+        size_t first = m_ring_cap - m_head; if (first > n) first = n;
         std::memcpy(dst, m_ring + m_head, first);
         std::memcpy(dst + first, m_ring, n - first);
-        m_head = (m_head + n) % RING;
+        m_head = (m_head + n) % m_ring_cap;
     }
 
     // Background producer: pull bytes off the connection into the ring buffer.
@@ -64,9 +80,9 @@ namespace jelly {
             size_t off = 0;
             while (off < (size_t)n) {
                 mutexLock(&m_mtx);
-                while (m_count == RING && !m_stop) condvarWait(&m_cv_space, &m_mtx);
+                while (m_count == m_ring_cap && !m_stop) condvarWait(&m_cv_space, &m_mtx);
                 if (m_stop) { mutexUnlock(&m_mtx); return; }
-                size_t put = RING - m_count;
+                size_t put = m_ring_cap - m_count;
                 if (put > (size_t)n - off) put = (size_t)n - off;
                 ring_put(tmp + off, put);
                 m_count += put;
@@ -119,9 +135,9 @@ namespace jelly {
             }
         }
 
-        size_t seed = r.residual.size() < RING ? r.residual.size() : RING;
+        size_t seed = r.residual.size() < m_ring_cap ? r.residual.size() : m_ring_cap;
         std::memcpy(m_ring, r.residual.data(), seed);
-        m_tail = seed % RING;
+        m_tail = seed % m_ring_cap;
         m_count = seed;
         m_head = 0;
         m_pos = offset;

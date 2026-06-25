@@ -30,7 +30,7 @@ u32 __nx_fs_num_sessions = 1;
 // TODO(TJ): calculate reasonable amount of heap for playlist entries.
 // Bumped to make room for socket transfer memory + the 1 MB prefetch ring + decode.
 void __libnx_initheap(void) {
-    static char inner_heap[1024 * 1024 * 2];
+    static char inner_heap[1024 * 768];
     extern char *fake_heap_start;
     extern char *fake_heap_end;
 
