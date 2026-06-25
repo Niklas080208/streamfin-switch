@@ -26,11 +26,11 @@ extern "C" {
 u32 __nx_applet_type     = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 
-// TODO(TJ): calculate minimum heap
-// TODO(TJ): calculate reasonable amount of heap for playlist entries.
-// Bumped to make room for socket transfer memory + the 1 MB prefetch ring + decode.
+// Static heap covers socket transfer memory + decode + playlist entries. The
+// prefetch ring is claimed on-demand from a separate heap region while a track
+// streams (see jelly_net.cpp), so it isn't reserved here.
 void __libnx_initheap(void) {
-    static char inner_heap[1024 * 1024 * 2];
+    static char inner_heap[1024 * 768];
     extern char *fake_heap_start;
     extern char *fake_heap_end;
 
