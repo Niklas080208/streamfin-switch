@@ -1,5 +1,5 @@
 export GITHASH 		:= $(shell git rev-parse --short HEAD)
-export VERSION 		:= 1.0.0
+export VERSION 		:= 1.0.1
 export API_VERSION 	:= 4
 export WANT_FLAC 	:= 1
 export WANT_MP3 	:= 1
