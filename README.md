@@ -8,8 +8,8 @@ Heavily built off of the wonderful work of [sys-tune](https://github.com/HookedB
 **REQUIRES [ULTRAHAND OVERLAY](https://github.com/ppkantorski/Ultrahand-Overlay) TO BE INSTALLED!!** 
 Go install that first from the link, or you can one-click install it in the homebrew app store of your choice.
 
-## Need help, want updates, or want to show off your setup?
-<p align="center">
+Comments/Questions/Need help? Join the discord!
+<p align="left">
   <a href="https://discord.gg/mQxBxGgT5h"><img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join the Streamfin Discord"></a>
 </p>
 
