@@ -263,7 +263,7 @@ void StatusBar::ResolveJellyTrack() {
     id = id ? id + 1 : path_buffer + 8;
 
     if (std::strcmp(id, this->m_last_id) != 0) {
-        std::strncpy(this->m_last_id, id, sizeof(this->m_last_id) - 1);
+        std::snprintf(this->m_last_id, sizeof(this->m_last_id), "%s", id);
         std::snprintf(this->m_name_buf, sizeof(this->m_name_buf), "%s", id);   // placeholder until resolved
         this->m_current_track = this->m_name_buf;
         this->m_name_resolved = false;
