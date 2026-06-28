@@ -95,24 +95,27 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     const s32 bar_x   = SeekBarX();
     const u32 bar_len = SeekBarLen();
     const s32 bar_y   = SeekY();
-    if (this->m_focus == 5) {
-        renderer->drawRect(bar_x - 2, bar_y - 6, bar_len + 4, 15, 0x4FFF);
+    constexpr s32 kSeekThumbRadius = 7;
+    const s32 track_cy = bar_y + 1;   // vertical center of the 7px fill (bar_y - 2 .. bar_y + 4)
+    const bool seek_focused = (this->m_focus == 5);
+    const tsl::Color seek_fill = {0x0, 0xA, 0xD, 0xF};   // Jellyfin blue #00A4DC
+    if (seek_focused) {
+        renderer->drawRect(bar_x - 1, bar_y - 3, bar_len + 2, 9, a({0x0, 0xA, 0xD, 0xA}));
     }
-    renderer->drawRect(bar_x, bar_y, bar_len, 3, 0xF666);   // dim track
-    if (this->m_percentage > 0) {
-        // Filled portion as a Jellyfin blue->purple gradient (RGBA4444: 0x(a)(b)(g)(r)).
-        // blue #00A4DC -> r0 gA bD,  purple #AA5CC3 -> rA g5 bC.
-        const u32 fill = (u32)(bar_len * this->m_percentage);
-        for (u32 i = 0; i < fill; i++) {
-            const float t = bar_len > 0 ? (float)i / (float)bar_len : 0.f;
-            const u8 r = (u8)(0x0 + 0xA * t);
-            const u8 g = (u8)(0xA - 0x5 * t);
-            const u8 b = (u8)(0xD - 0x1 * t);
-            renderer->drawRect(bar_x + (s32)i, bar_y - 2, 1, 7, (u16)((0xF << 12) | (b << 8) | (g << 4) | r));
+    renderer->drawRect(bar_x, bar_y, bar_len, 3, seek_focused ? 0xFCCC : 0xF666);   // dim track
+    const u32 fill = this->m_stats.total_frames > 0
+        ? (u32)(bar_len * this->m_percentage) : 0;
+    if (fill > 0) {
+        renderer->drawRect(bar_x, bar_y - 2, fill, 7, a(seek_fill));
+    }
+    if (this->m_stats.total_frames > 0) {
+        const s32 thumb_x = bar_x + (s32)fill;
+        if (seek_focused) {
+            renderer->drawCircle(thumb_x, track_cy, kSeekThumbRadius + 4, true, 0xFFFF);
+            renderer->drawCircle(thumb_x, track_cy, kSeekThumbRadius, true, a(seek_fill));
+        } else {
+            renderer->drawCircle(thumb_x, track_cy, kSeekThumbRadius, true, a(seek_fill));
         }
-        const float tp = this->m_percentage;
-        const u8 r = (u8)(0x0 + 0xA * tp), g = (u8)(0xA - 0x5 * tp), b = (u8)(0xD - 0x1 * tp);
-        renderer->drawCircle(bar_x + (s32)fill, bar_y + 1, 4, true, (u16)((0xF << 12) | (b << 8) | (g << 4) | r));
     }
     renderer->drawString(current_buffer, false, bar_x, bar_y + 26, 18, 0xffff);
     renderer->drawString(total_buffer, false, this->getX() + this->getWidth() - 55, bar_y + 26, 18, 0xffff);
